@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/lczm/chippy8/chip8"
@@ -38,8 +37,6 @@ func main() {
 
 	for !rl.WindowShouldClose() {
 		c8.Cycle()
-
-		os.Exit(0)
 
 		if c8.DrawFlag {
 			rl.BeginDrawing()

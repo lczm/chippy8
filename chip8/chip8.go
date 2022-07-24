@@ -2,6 +2,7 @@ package chip8
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -56,7 +57,7 @@ type Chip8 struct {
 
 	// Theres only 16 keys in chip8, use this to
 	// store the state of the key
-	key [16]uint8
+	key [16]bool
 }
 
 func New(scale int) *Chip8 {
@@ -64,7 +65,7 @@ func New(scale int) *Chip8 {
 		scale:          scale,
 		ScaledWidth:    scale * width,
 		ScaledHeight:   scale * height,
-		DrawFlag:       true,
+		DrawFlag:       false,
 		programCounter: 0x200,
 		indexRegister:  0,
 		stackPointer:   0,
@@ -72,7 +73,7 @@ func New(scale int) *Chip8 {
 		soundTimer:     0,
 	}
 
-	// Load fonts
+	// Load fonts into memory
 	for i := 0; i < 80; i++ {
 		c8.memory[i] = C8FontSet[i]
 	}
@@ -132,12 +133,208 @@ func (c8 *Chip8) Cycle() {
 		uint16(c8.memory[c8.programCounter+1])
 
 	// Decode opcode
+	// doing & 0xF000 makes it so that the switch case can go
+	// on 0x10, 0x20 instead
 	switch c8.opcode & 0xF000 {
-	case 0xA000: // ANNN
+	case 0x0000:
+		switch c8.opcode {
+		case 0x00E0: // 00E0 - Display - Clear the screen
+			fmt.Println("0x00E0")
+			for i := 0; i < width; i++ {
+				for j := 0; j < height; j++ {
+					c8.display[i][j] = false
+				}
+			}
+			c8.programCounter += 2
+			c8.DrawFlag = true
+		case 0x00EE: // 00EE - Flow - Return from subroutine
+			fmt.Println("0x00EE")
+			c8.programCounter = c8.stack[c8.stackPointer]
+			c8.stackPointer--
+			c8.programCounter += 2
+		default: // TODO : Can return unknown opcode here
+			fmt.Printf("Cannot find opcode: %x\n", c8.opcode)
+		}
+	case 0x1000: // 1NNN - Flow - Jump to location NNN
+		fmt.Println("0x1NNN")
+		// Masked out by & 0xF000 at the start,
+		// to mask it back in, use & 0x0FFF
+		c8.programCounter = c8.opcode & 0x0FFF
+	case 0x2000: // 2NNN - Flow - Call subroutine at NNN
+		fmt.Println("0x2NNN")
+		c8.stackPointer++
+		c8.stack[c8.stackPointer] = c8.programCounter
+		c8.programCounter = c8.opcode & 0x0FFF
+	case 0x3000: // 3XKK - Cond - Skip next instruction if VX == NN
+		fmt.Println("0x3XKK")
+		if c8.registers[(c8.opcode&0x0F00)>>8] == uint8(c8.opcode)&0x00FF {
+			c8.programCounter += 4
+		} else {
+			c8.programCounter += 2
+		}
+	case 0x4000: // 4XKK - Cond - Skip next instruction if VX != NN
+		fmt.Println("0x4XKK")
+		if c8.registers[(c8.opcode&0x0F00)>>8] != uint8(c8.opcode)&0x00FF {
+			c8.programCounter += 4
+		} else {
+			c8.programCounter += 2
+		}
+	case 0x5000: // 5XY0 - Cond - Skip next instruction if VX == VY
+		fmt.Println("0x5XY0")
+		if c8.registers[(c8.opcode&0x0F00)>>8] == c8.registers[(c8.opcode&0x00F0)>>4] {
+			c8.programCounter += 4
+		} else {
+			c8.programCounter += 2
+		}
+	case 0x6000: // 6XNN - Const - Sets VX to NN
+		fmt.Println("0x6XNN")
+		c8.registers[(c8.opcode&0x0F00)>>8] = uint8(c8.opcode) & 0x00FF
+		c8.programCounter += 2
+	case 0x7000: // 7XNN - 	Const - Adds NN to VX
+		fmt.Println("0x7XNN")
+		c8.registers[(c8.opcode&0x0F00)>>8] += uint8(c8.opcode) & 0x00FF
+		c8.programCounter += 2
+	case 0x8000: // TODO
+		switch c8.opcode & 0x000F {
+		case 0x0000: // 8XY0 - Assignment -  Set VX to VY
+			fmt.Println("0x8XY0")
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x00F0)>>4]
+			c8.programCounter += 2
+		case 0x0001: // 8XY1 - BitOp - Sets VX to (VX OR VY), bitwise
+			fmt.Println("0x8XY1")
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x0F00)>>8] | c8.registers[(c8.opcode&0x00F0)>>4]
+			c8.programCounter += 2
+		case 0x0002: // 8XY2 - BitOp - Sets VX to (VX AND VY), bitwise
+			fmt.Println("0x8XY2")
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x0F00)>>8] & c8.registers[(c8.opcode&0x00F0)>>4]
+			c8.programCounter += 2
+		case 0x0003: // 8XY3 - BitOp - Sets VX to (VX XOR VY), bitwise
+			fmt.Println("0x8XY3")
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x0F00)>>8] ^ c8.registers[(c8.opcode&0x00F0)>>4]
+			c8.programCounter += 2
+		case 0x0004: // 8XY4 - Math - Adds VY TO VX, VF set to 1 if there's a carry, to 0 if theres not
+			fmt.Println("0x8XY4")
+			if c8.registers[(c8.opcode&0x00F0)>>4] > 0xFF-c8.registers[(c8.opcode&0x0F00)>>8] {
+				c8.registers[15] = 1
+			} else {
+				c8.registers[15] = 0
+			}
+			c8.registers[(c8.opcode&0x0F00)>>8] += c8.registers[(c8.opcode&0x00F0)>>4]
+			c8.programCounter += 2
+		case 0x0005: // 8XY5 - Math - Subtract VY FROM VX, VF set to 0 if there's a borrow, 1 when there is not
+			fmt.Println("0x8XY5")
+			if c8.registers[(c8.opcode&0x00F0)>>4] > 0xFF-c8.registers[(c8.opcode&0x0F00)>>8] {
+				c8.registers[15] = 0
+			} else {
+				c8.registers[15] = 1
+			}
+			c8.registers[(c8.opcode&0x0F00)>>8] -= c8.registers[(c8.opcode&0x00F0)>>4]
+			c8.programCounter += 2
+		case 0x0006: // 8XY6 - BitOp - Store the least significant bit of VX in VF, then shift VX to the right by 1
+			fmt.Println("0x8XY6")
+			// Store least significant bit of VX in VF (1 is the least significant bit)
+			c8.registers[15] = c8.registers[(c8.opcode&0x0F00)>>8] & 0x1
+			// Shift VX to the right by 1
+			c8.registers[(c8.opcode & 0x0F00)] = c8.registers[(c8.opcode&0x0F00)>>8] >> 1
+			c8.programCounter += 2
+		case 0x0007: // 8XY7 - Math - Sets VX to VF - VX, VF is set to 0 if there's a borrow, 1 when there is not
+			fmt.Println("0x8XY7")
+			if c8.registers[(c8.opcode&0x00F0)>>4] > 0xFF-c8.registers[(c8.opcode&0x0F00)>>8] {
+				c8.registers[15] = 0
+			} else {
+				c8.registers[15] = 1
+			}
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x00F0)>>4] - c8.registers[(c8.opcode&0x0F00)>>8]
+			c8.programCounter += 2
+		case 0x000E: // 8XYE - BitOp - Store the most significant bit of VX in VF, then shift VX to the left by 1
+			fmt.Println("0x8XYE")
+			// Store the most significant bit of VX in VF (7 is the most significant bit)
+			c8.registers[15] = c8.registers[(c8.opcode&0x0F00)>>8] & 0x7
+			c8.registers[(c8.opcode & 0x0F00)] = c8.registers[(c8.opcode&0x0F00)>>8] << 1
+			c8.programCounter += 2
+		}
+	case 0x9000: // 9XY0 - Cond - Skip next instruction if VX != VY
+		fmt.Println("0x9XY0")
+		if c8.registers[(c8.opcode&0x0F00)>>8] != c8.registers[(c8.opcode&0x00F0)>>4] {
+			c8.programCounter += 4
+		} else {
+			c8.programCounter += 2
+		}
+	case 0xA000: // ANNN - Mem - Sets address I = address NNN
+		fmt.Println("0xA000")
 		c8.indexRegister = c8.opcode & 0x0FFF
 		c8.programCounter += 2
+	case 0xB000: // BNNN - Flow - Jumps to address NNN + V0
+		fmt.Println("0xB000")
+		c8.programCounter = c8.opcode&0x0FFF + uint16(c8.registers[0])
+	case 0xC000: // CXNN - Rand - Set VX = Rand(0-255) & NN
+		fmt.Println("0xCXNN")
+		c8.registers[(c8.opcode&0x0F00)>>8] = uint8(rand.Intn(256)) & uint8(c8.opcode&0x00FF)
+		c8.programCounter += 2
+	case 0xD000: // (TODO) DXYN - Display - Draw sprite at coordinate VX, VY
+		fmt.Println("0xDXYN")
+		x := c8.registers[(c8.opcode&0x0F00)>>8]
+		y := c8.registers[(c8.opcode&0x00F0)>>4]
+
+		_ = x
+		_ = y
+		c8.DrawFlag = true
+		c8.programCounter += 2
+	case 0xE000: // EX9E | EXA1
+		switch c8.opcode & 0xFFF0 {
+		case 0x000E: // EX9E - KeyOp - Skip next instruction if key stored in VX is pressed
+			fmt.Println("0xEX9E")
+			if c8.key[c8.registers[(c8.opcode&0x0F00)>>8]] {
+				c8.programCounter += 4
+			} else {
+				c8.programCounter += 2
+			}
+		case 0x0001: // EXA1 - KeyOp - Skip next instruction if key stored in VX is NOT pressed
+			fmt.Println("0xEXA1")
+			if !c8.key[c8.registers[(c8.opcode&0x0F00)>>8]] {
+				c8.programCounter += 4
+			} else {
+				c8.programCounter += 2
+			}
+		}
+	case 0xF000: // FX07 | FX0A | FX15 | FX18 | FX1E | FX29 | FX33 | FX55 | FX65
+		switch c8.opcode & 0x00FF {
+		case 0x0007: // FX07 - Timer - Set VX to value of delay timer
+			fmt.Println("0xFX07")
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.delayTimer
+			c8.programCounter += 2
+		case 0x000A: // (TODO) FX0A - KeyOp - Wait for keypress, store in VX
+			fmt.Println("0xFX0A")
+			c8.programCounter += 2
+		case 0x0015: // FX15 - Timer - Set delay timer to VX
+			fmt.Println("0xFX15")
+			c8.delayTimer = c8.registers[(c8.opcode&0x0F00)>>8]
+			c8.programCounter += 2
+		case 0x0018: // FX18 - Sound - Set sound timer to VX
+			fmt.Println("0xFX18")
+			c8.soundTimer = c8.registers[(c8.opcode&0x0F00)>>8]
+			c8.programCounter += 2
+		case 0x001E: // FX1E - MEM - Add VX to I
+			fmt.Println("0xFX1E")
+			c8.indexRegister += uint16(c8.registers[(c8.opcode&0x0F00)>>8])
+			c8.programCounter += 2
+		case 0x0029: // (TODO) FX29 - MEM - Set I to location of sprite for character in VX
+			fmt.Println("0xFX29")
+			c8.programCounter += 2
+		case 0x0033: // (TODO) FX33 - BCD - Stores the binary-coded decimal representation of VX, with the most significant of three digits at the address in I, the middle digit at I plus 1, and the least significant digit at I plus 2
+			fmt.Println("0xFX33")
+			c8.programCounter += 2
+		case 0x0055: // (TODO) FX55 - MEM - Stores from V0 to VX (including VX) in memory, starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified
+			fmt.Println("0xFX55")
+			c8.programCounter += 2
+		case 0x0065: // (TODO) FX65 - MEM - Fills from V0 to VX (including VX) with values from memory, starting at address I. The offset from I is increased by 1 for each value read, but I itself is left unmodified
+			fmt.Println("0xFX65")
+			c8.programCounter += 2
+		default:
+			fmt.Printf("Cannot find opcode: %x\n", c8.opcode)
+		}
 	default:
-		fmt.Println("Cannot find opcode")
+		fmt.Printf("Cannot find opcode: %x\n", c8.opcode)
 	}
 
 	// Update delay timer
