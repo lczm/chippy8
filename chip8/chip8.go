@@ -39,8 +39,8 @@ type Chip8 struct {
 
 	DrawFlag bool
 
-	display [width][height]bool // display array
-	memory  [4096]uint8         // 4k memory emulated
+	display [width][height]uint8 // display array
+	memory  [4096]uint8          // 4k memory emulated
 
 	opcode         uint16
 	registers      [16]uint8 // 15 8-bit registers, 16th is 'carry flag'
@@ -80,7 +80,7 @@ func New(scale int) *Chip8 {
 
 	// Temporary test
 	for i := 0; i < width; i++ {
-		c8.display[i][0] = true
+		c8.display[i][0] = 1
 	}
 
 	return c8
@@ -113,7 +113,7 @@ func (c8 *Chip8) Draw() {
 		for h := 0; h < height; h++ {
 			// If the array is "active", draw a "pixel"
 			// TODO : Draw a rectangle instead
-			if c8.display[i][h] {
+			if c8.display[i][h] == 1 {
 				// For every pixel, render its "scaled" version
 				for ws := 0; ws < c8.scale; ws++ {
 					for wh := 0; wh < c8.scale; wh++ {
@@ -142,7 +142,7 @@ func (c8 *Chip8) Cycle() {
 			fmt.Println("0x00E0")
 			for i := 0; i < width; i++ {
 				for j := 0; j < height; j++ {
-					c8.display[i][j] = false
+					c8.display[i][j] = 0
 				}
 			}
 			c8.programCounter += 2
@@ -275,9 +275,23 @@ func (c8 *Chip8) Cycle() {
 		fmt.Println("0xDXYN")
 		x := c8.registers[(c8.opcode&0x0F00)>>8]
 		y := c8.registers[(c8.opcode&0x00F0)>>4]
+		h := c8.opcode & 0x000F
+		c8.registers[15] = 0
 
-		_ = x
-		_ = y
+		var i uint16 = 0
+		var j uint16 = 0
+		for j = 0; j < h; j++ {
+			pixel := c8.memory[c8.indexRegister+j]
+			for i = 0; i < 8; i++ {
+				if (pixel & (0x80 >> i)) != 0 {
+					if c8.display[(y + uint8(j))][x+uint8(i)] == 1 {
+						c8.registers[15] = 1
+					}
+					c8.display[(y + uint8(j))][x+uint8(i)] ^= 1
+				}
+			}
+		}
+
 		c8.DrawFlag = true
 		c8.programCounter += 2
 	case 0xE000: // EX9E | EXA1
