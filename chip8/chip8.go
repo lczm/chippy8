@@ -235,7 +235,7 @@ func (c8 *Chip8) Cycle() {
 			// Store least significant bit of VX in VF (1 is the least significant bit)
 			c8.registers[15] = c8.registers[(c8.opcode&0x0F00)>>8] & 0x1
 			// Shift VX to the right by 1
-			c8.registers[(c8.opcode & 0x0F00)] = c8.registers[(c8.opcode&0x0F00)>>8] >> 1
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x0F00)>>8] >> 1
 			c8.programCounter += 2
 		case 0x0007: // 8XY7 - Math - Sets VX to VF - VX, VF is set to 0 if there's a borrow, 1 when there is not
 			fmt.Println("0x8XY7")
@@ -250,7 +250,7 @@ func (c8 *Chip8) Cycle() {
 			fmt.Println("0x8XYE")
 			// Store the most significant bit of VX in VF (7 is the most significant bit)
 			c8.registers[15] = c8.registers[(c8.opcode&0x0F00)>>8] & 0x7
-			c8.registers[(c8.opcode & 0x0F00)] = c8.registers[(c8.opcode&0x0F00)>>8] << 1
+			c8.registers[(c8.opcode&0x0F00)>>8] = c8.registers[(c8.opcode&0x0F00)>>8] << 1
 			c8.programCounter += 2
 		}
 	case 0x9000: // 9XY0 - Cond - Skip next instruction if VX != VY
@@ -284,10 +284,11 @@ func (c8 *Chip8) Cycle() {
 			pixel := c8.memory[c8.indexRegister+j]
 			for i = 0; i < 8; i++ {
 				if (pixel & (0x80 >> i)) != 0 {
-					if c8.display[(y + uint8(j))][x+uint8(i)] == 1 {
+					// if c8.display[(y + uint8(j))][x+uint8(i)] == 1 {
+					if c8.display[(x + uint8(i))][y+uint8(j)] == 1 {
 						c8.registers[15] = 1
 					}
-					c8.display[(y + uint8(j))][x+uint8(i)] ^= 1
+					c8.display[(x + uint8(i))][y+uint8(j)] ^= 1
 				}
 			}
 		}
