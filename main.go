@@ -49,16 +49,6 @@ func main() {
 
 			rl.EndDrawing()
 		}
-
-		// b1 := uint16(buffer[programCounter])
-		// b2 := uint16(buffer[programCounter+1])
-
-		// Shift the first op left by 8 bits,
-		// which will add 8 bits to the end
-		// do and OR operation, to add 8 more bits
-		// to the 8 bits that just got added
-		// op := uint16(b1<<8) | uint16(b2)
-		// programCounter += 2
 	}
 
 	CloseDisplay()
