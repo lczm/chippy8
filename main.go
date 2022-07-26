@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"github.com/lczm/chippy8/chip8"
@@ -30,9 +31,21 @@ func CloseDisplay() {
 }
 
 func main() {
+	args := os.Args
+
+	if len(args) != 2 {
+		fmt.Println("Please call ./chip8 {rom}")
+		os.Exit(0)
+	}
+
+	rom := os.Args[1]
+	if _, err := os.Open(rom); err != nil {
+		fmt.Println("{rom} does not exist")
+		os.Exit(0)
+	}
+
 	c8 := chip8.New(scale)
-	c8.ReadRom("./roms/test_opcode.ch8")
-	// c8.ReadRom("./roms/c8_test.c8")
+	c8.ReadRom(rom)
 
 	InitDisplay(c8.ScaledWidth, c8.ScaledHeight)
 
