@@ -78,11 +78,6 @@ func New(scale int) *Chip8 {
 		c8.memory[i] = C8FontSet[i]
 	}
 
-	// Temporary test
-	for i := 0; i < width; i++ {
-		c8.display[i][0] = 1
-	}
-
 	return c8
 }
 

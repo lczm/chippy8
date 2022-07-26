@@ -32,6 +32,7 @@ func CloseDisplay() {
 func main() {
 	c8 := chip8.New(scale)
 	c8.ReadRom("./roms/test_opcode.ch8")
+	// c8.ReadRom("./roms/c8_test.c8")
 
 	InitDisplay(c8.ScaledWidth, c8.ScaledHeight)
 
