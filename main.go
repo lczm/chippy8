@@ -55,8 +55,6 @@ func main() {
 		if c8.DrawFlag {
 			rl.BeginDrawing()
 
-			// raygui.Label(rl.NewRectangle(50, 50, 20, 20), "label")
-
 			// Clear the background to be white
 			// so that a new screen can be drawn
 			rl.ClearBackground(rl.RayWhite)
@@ -64,6 +62,15 @@ func main() {
 			c8.Draw()
 
 			rl.EndDrawing()
+		}
+
+		// Update keys array
+		for k, v := range chip8.KeyMap {
+			if rl.IsKeyDown(k) {
+				c8.Key(v, true)
+			} else if rl.IsKeyUp(k) {
+				c8.Key(v, false)
+			}
 		}
 	}
 

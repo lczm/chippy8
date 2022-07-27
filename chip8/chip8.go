@@ -32,6 +32,13 @@ var C8FontSet = []uint8{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, //F
 }
 
+var KeyMap = map[int32]byte{
+	rl.KeyOne: 0x01, rl.KeyTwo: 0x02, rl.KeyThree: 0x03, rl.KeyFour: 0x0C,
+	rl.KeyQ: 0x04, rl.KeyW: 0x05, rl.KeyE: 0x06, rl.KeyR: 0x0D,
+	rl.KeyA: 0x07, rl.KeyS: 0x08, rl.KeyD: 0x09, rl.KeyF: 0x0E,
+	rl.KeyZ: 0x0A, rl.KeyX: 0x00, rl.KeyC: 0x0B, rl.KeyV: 0x0F,
+}
+
 type Chip8 struct {
 	scale        int
 	ScaledWidth  int
@@ -121,6 +128,10 @@ func (c8 *Chip8) Draw() {
 	}
 }
 
+func (c8 *Chip8) Key(index byte, value bool) {
+	c8.key[index] = value
+}
+
 // Emulate one cycle
 func (c8 *Chip8) Cycle() {
 	// Get opcode
@@ -147,7 +158,7 @@ func (c8 *Chip8) Cycle() {
 			c8.programCounter = c8.stack[c8.stackPointer]
 			c8.stackPointer--
 			c8.programCounter += 2
-		default: // TODO : Can return unknown opcode here
+		default:
 			fmt.Printf("Cannot find opcode: %x\n", c8.opcode)
 		}
 	case 0x1000: // 1NNN - Flow - Jump to location NNN
@@ -189,7 +200,7 @@ func (c8 *Chip8) Cycle() {
 		fmt.Println("0x7XNN")
 		c8.registers[(c8.opcode&0x0F00)>>8] += uint8(c8.opcode) & 0x00FF
 		c8.programCounter += 2
-	case 0x8000: // TODO
+	case 0x8000:
 		switch c8.opcode & 0x000F {
 		case 0x0000: // 8XY0 - Assignment -  Set VX to VY
 			fmt.Println("0x8XY0")
@@ -266,7 +277,7 @@ func (c8 *Chip8) Cycle() {
 		fmt.Println("0xCXNN")
 		c8.registers[(c8.opcode&0x0F00)>>8] = uint8(rand.Intn(256)) & uint8(c8.opcode&0x00FF)
 		c8.programCounter += 2
-	case 0xD000: // (TODO) DXYN - Display - Draw sprite at coordinate VX, VY
+	case 0xD000: // DXYN - Display - Draw sprite at coordinate VX, VY
 		fmt.Println("0xDXYN")
 		x := c8.registers[(c8.opcode&0x0F00)>>8]
 		y := c8.registers[(c8.opcode&0x00F0)>>4]
